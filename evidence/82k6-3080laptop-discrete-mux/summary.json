@@ -1,0 +1,24 @@
+{
+  "hardware": "RTX 3080 Laptop (GA106, 24dc10de, subsystem 3f8417aa) in Lenovo Legion 7 15ACH6 (82K6), BIOS MUX set to discrete (dGPU-only mode)",
+  "machine": {
+    "bios_version": "H.13 (current Lenovo BIOS for 15ACH6)",
+    "fwsec_frts_digest": "unverified (no machine profile generated yet; internal-boot handoff capture only)"
+  },
+  "status": "capture-review",
+  "usb": {
+    "read_only_probe": true,
+    "handoff_status": "internal-handoff-v1 status=0x0000000000000000 (2026-10-28 10:46 boot from USB stick, dGPU at 0001:00:00.0, handoff reached, Windows started afterwards)",
+    "capture_count": 2,
+    "capture_complete": 2,
+    "pci_config_matches": 2,
+    "prom_sha256": "91db59aaf59d3ec5e822a3412536968ab5fcbfeb90392d1a57a2b28b37d4a368",
+    "mmio": {
+      "chip": "0xb74000a1",
+      "device_memory_size": "0x4000",
+      "nvgop_driver": "6.13.0.33",
+      "nvgop_code_sha256": "4d23005d5316449c46b4c3936680cb56bd1f840353a0d222345b18a06aeac5cc"
+    }
+  },
+  "qualification": {"passed": false},
+  "notes": "Card admission evidence only: byte-identical PCI configuration across cold-boot stick captures (see research/rtx3080/laptop-gpu-24dc10de-2026-10-28-review.md), full MMIO identity set (0x1183a4=0x4000 16 GiB, chip b74000a1), loaded nvgop-ga1xx driver named by GOP file-path node with stop point inside the hashed code span (replay gate satisfied), and 12 MiB PROM digest. Unlock was not run; qualification is for the following stage."
+}
