@@ -75,7 +75,20 @@ static VOID Path(CAPTURE *c,const EFI_DEVICE_PATH_PROTOCOL *p,UINTN bound,BOOLEA
   for(UINTN nodes=0;nodes<256 && at+4<=bound;nodes++) {
     const UINT8 *b=(const VOID *)p;
     UINTN n=b[2]+((UINTN)b[3]<<8);
-    if(n<4 || n>bound-at){Problem(c,"path-node-length",EFI_COMPROMISED_DATA);return;}
+    if(n<4 || n>bound-at){
+      /*
+       * Pointer-trust paths (exact=FALSE) carry no authoritative buffer length: some Lenovo
+       * GA104 mobile console-handle paths end right after a 37-byte vendor messaging node
+       * (0x03 0x0b) with no END node, so the next "header" is allocator padding. Nodes dumped
+       * before the tail are valid and are exactly the PCIe topology evidence a profile needs;
+       * messaging nodes live only at a path's tail. Stop there without invalidating the
+       * capture. A malformed FIRST node, or any truncation inside an exact variable buffer,
+       * stays a hard fault.
+       */
+      if(exact || at==0){Problem(c,"path-node-length",EFI_COMPROMISED_DATA);return;}
+      Text(c,"path-tail-truncated=");Hex(c,(UINT64)at,8);Text(c," declared=");Hex(c,(UINT64)n,4);End(c);
+      return;
+    }
     Text(c,"path-node raw=");for(UINTN j=0;j<n;j++)Hex(c,b[j],2);End(c);
     at+=n;
     if(b[0]==END_DEVICE_PATH_TYPE) {
@@ -233,7 +246,10 @@ EFI_STATUS GuCaptureGraphOnVolume(EFI_SYSTEM_TABLE *t,EFI_FILE_PROTOCOL *file,EF
   FreeCapture(&c,handles,"handles-free");
   Text(&c,c.Complete?"capture-complete=1\r\n":"capture-complete=0\r\n");
   s=Flush(&c);if(s!=EFI_SUCCESS)return s;
-  s=file->Flush(file);if(s!=EFI_SUCCESS)return s;
+  /* Lenovo's SimpleFileSystem returns EFI_UNSUPPORTED from Flush even though
+   * every byte is already written and Close() commits them; that is a
+   * firmware quirk, not data loss, so it must not fail the capture. */
+  s=file->Flush(file);if(s!=EFI_SUCCESS&&s!=EFI_UNSUPPORTED)return s;
   return c.Complete?EFI_SUCCESS:EFI_NOT_READY;
 }
 EFI_STATUS GuCaptureGraph(EFI_SYSTEM_TABLE *t,EFI_FILE_PROTOCOL *file) {
