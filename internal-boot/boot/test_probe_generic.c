@@ -13,6 +13,9 @@ enum {G_OK,G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,
       G_ATTR_FAIL,G_ATTR_MEM,G_ATTR_BME,G_ATTR_CONFIG,G_ATTR_BDF,G_ATTR_INTERFACE};
 static int Mode,RootCloses,RootOpens,ForeignOpens,SfsSearches,Dumps,ExistingWriteAttempts;
 static EFI_FILE_PROTOCOL DumpFile,ForeignRoot;
+/* Assigned in the borrow-root fixture; read below to keep clang's set-but-not-used
+ * quiet across the matrix of profile defines, where the read is conditional. */
+#define GU_FOREIGN_ROOT_READ (void)ForeignRoot;
 static EFI_HANDLE BindingHandle=(VOID *)50,ImageHandle=(VOID *)51;
 static EFI_DRIVER_BINDING_PROTOCOL Binding;
 static EFI_LOADED_IMAGE_PROTOCOL Image;
@@ -125,7 +128,7 @@ static EFI_STATUS EFIAPI DumpOpen(EFI_FILE_PROTOCOL *f,EFI_FILE_PROTOCOL **out,C
 static void GenericSetup(int mode) {
   Setup(SC_OK);Mode=mode;RootCloses=RootOpens=ForeignOpens=SfsSearches=Dumps=0;
   ActiveCapture=NULL;Drifted=ReadsAfterDrift=0;
-  ExistingWriteAttempts=0;
+  ExistingWriteAttempts=0;(void)ExistingWriteAttempts;
   Pci.Pci.Read=GenericRead;Pci.GetBarAttributes=Bar;Pci.GetLocation=GenericLocation;
   Pci.Attributes=Attr;AttributeGets=AttributeOthers=0;
   AttributeReturned=FALSE;AttributeConfigReads=0;
@@ -134,6 +137,7 @@ static void GenericSetup(int mode) {
   memset(&Image,0,sizeof(Image));Image.ImageBase=ImageBytes;Image.ImageSize=sizeof(ImageBytes);
   DumpFile=LogFile;DumpFile.Write=DumpWrite;DumpFile.Flush=DumpFlush;DumpFile.Close=DumpClose;
   RootFile.Open=DumpOpen;RootFile.Close=BorrowedClose;ForeignRoot=RootFile;
+  GU_FOREIGN_ROOT_READ;
 }
 static EFI_STATUS GenericRun(int mode,BOOLEAN withRoot) {
   GenericSetup(mode);

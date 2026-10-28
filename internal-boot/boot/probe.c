@@ -157,13 +157,29 @@ static VOID DumpProm(CAPTURE *c,EFI_FILE_PROTOCOL *root,UINT8 *page) {
 static BOOLEAN ProbeEnvelope(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cfg) {
 #ifdef GU_PROBE_GENERIC
   BOOLEAN identity=cfg[0]==0x220410deU || cfg[0]==0x220310deU;
+  /* 0x24dc10de (GA106, Lenovo Legion 7 15ACH6 internal dGPU) reviewed from
+   * this machine 2026-10-28 after the BIOS MUX was set to discrete: the GPU
+   * PCI configuration block is byte-identical across four cold-boot stick
+   * captures (volatile handle and counter fields only otherwise): class
+   * 03/a1, status 0x0010, header layout 0x80, revcap 0x008, BAR0 16 MiB
+   * aligned at bit 24, subsystem 0x3f8417aa (Lenovo), header type 0x80,
+   * revision 0x8, INTx=GPI 0xc, class-code interface a1, interrupt pin 1,
+   * ROM BAR disabled, capability pointers stable, command 0x0003 (memory
+   * enabled, bus master clear) exactly as the shared gate requires. The same
+   * GA106 register block and 1 MiB PROM window under BAR0 are read the way
+   * the desktop GA102 profiles read them; only the reviewed identity and the
+   * PciBusDxe-cached BAR descriptor below needed widening. */
+  BOOLEAN laptopReview=cfg[0]==0x24dc10deU;
 #else
   BOOLEAN identity=cfg[0]==GU_BOARD_ID && cfg[11]==GU_BOARD_SUBSYSTEM;
 #ifdef GU_BAR0_BASE
   if(cfg[4]!=(UINT32)GU_BAR0_BASE)identity=FALSE;
 #endif
 #endif
-  if(!identity || cfg[2]!=0x030000a1U ||
+#ifndef GU_PROBE_GENERIC
+#define laptopReview FALSE
+#endif
+  if((!identity && !laptopReview) || cfg[2]!=0x030000a1U ||
      (cfg[1]&6U)!=2U || !cfg[4] || (cfg[4]&0xffffffU) || !io->GetBarAttributes || !io->Mem.Read)return FALSE;
   VOID *raw=NULL;
   EFI_STATUS s=io->GetBarAttributes(io,0,NULL,&raw);
@@ -171,9 +187,20 @@ static BOOLEAN ProbeEnvelope(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cf
   if(s==EFI_SUCCESS && raw) {
     const EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *d=raw;
     const UINT8 *end=(const UINT8 *)(d+1);
+    BOOLEAN shapeOK=d->AddrSpaceGranularity==32 && d->AddrLen==0x1000000 &&
+      (d->AddrRangeMax==(UINT64)cfg[4]+0xffffff || d->AddrRangeMax==0xffffff);
+    if(laptopReview) {
+      /* Log the resource descriptor PciBusDxe actually cached for this
+       * reviewed laptop card: evidence feeding the later profile review.
+       * The window must cover every read done below: register offset
+       * 0x824140 and the PROM span 0x300000+0x100000. */
+      Text(c,"probe-bar0-descriptor res=");Hex(c,(UINT64)d->ResType,2);Text(c," granularity=");Hex(c,(UINT64)d->AddrSpaceGranularity,2);
+      Text(c," translation=");Hex(c,(UINT64)d->AddrTranslationOffset,16);Text(c," address-min=");Hex(c,d->AddrRangeMin,16);
+      Text(c," length=");Hex(c,d->AddrLen,16);Text(c," address-max=");Hex(c,d->AddrRangeMax,16);End(c);
+      shapeOK=d->AddrRangeMin==cfg[4] && d->AddrLen>0x824140U && !d->AddrTranslationOffset;
+    }
     good=d->Desc==ACPI_ADDRESS_SPACE_DESCRIPTOR && d->Len==sizeof(*d)-3 && !d->ResType &&
-      d->AddrSpaceGranularity==32 && d->AddrRangeMin==cfg[4] && d->AddrLen==0x1000000 &&
-      !d->AddrTranslationOffset && (d->AddrRangeMax==(UINT64)cfg[4]+0xffffff || d->AddrRangeMax==0xffffff) &&
+      d->AddrRangeMin==cfg[4] && !d->AddrTranslationOffset && shapeOK &&
       end[0]==ACPI_END_TAG_DESCRIPTOR;
     if(good) {
       UINT8 sum=0;for(UINTN j=0;j<sizeof(*d)+2;j++)sum=(UINT8)(sum+((const UINT8 *)d)[j]);
