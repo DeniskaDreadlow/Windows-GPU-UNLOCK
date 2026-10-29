@@ -66,9 +66,9 @@
           "text_sha256": "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
         },
         {
-          "version": "60013",
-          "text_sha256": "4d23005d5316449c46b4c3936680cb56bd1f840353a0d222345b18a06aeac5cc",
-          "evidence": "82k6-3080laptop-discrete-mux"
+          "version": "6000d",
+          "text_sha256": "26e1f8ec0c83c86bd888b2b59664cebff22c820f514a5dcd19939573c9485c51",
+          "evidence": "evidence/82k6-3080laptop-cold-20261028 (DIAG00 sha 2447d62b, IMG50 .text 156834B; version 0x6000d verbatim from capture; 3a3fdaa 60013/4d23005d pair never matched any observed version field)"
         }
       ],
       "evidence": [
@@ -122,6 +122,11 @@
       "version": "60013",
       "text_sha256": "4d23005d5316449c46b4c3936680cb56bd1f840353a0d222345b18a06aeac5cc",
       "evidence": "evidence/b550m-3090-usb"
+    },
+    {
+      "version": "6000d",
+      "text_sha256": "26e1f8ec0c83c86bd888b2b59664cebff22c820f514a5dcd19939573c9485c51",
+      "evidence": "evidence/82k6-3080laptop-cold-20261028"
     }
   ],
   "min_captures": 2

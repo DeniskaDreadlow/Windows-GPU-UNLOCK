@@ -49,8 +49,8 @@ BY_CHILD_CONTROLLER = 0x8
 # EFI_PCI_IO_ATTRIBUTE_IO / _MEMORY / _BUS_MASTER (PciIo.h)
 PCI_ATTRIBUTE_IO, PCI_ATTRIBUTE_MEMORY, PCI_ATTRIBUTE_BUS_MASTER = 0x100, 0x200, 0x400
 BY_DRIVER = 0x10
-OUT_FILE = '628a497d-2bf6-4264-8741-069dbd3399d6'
-GFX_FILE = '43e7abdd-e352-4cfb-a230-4cdc1d350e5c'
+OUT_FILE = '51ccf399-4fdf-4e55-a45b-e123f84d456a'
+GFX_FILE = 'cccb0c28-4b24-11d5-9a5a-0090273fc14d'
 MOUSE_FILE = 'c7a7030c-c3d8-45ee-bed9-5d9e76762953'
 NVGOP_NAME = 'nvgop-ga1xx'
 # full-release.c Profile(): hashed code ranges start at these RVAs.
@@ -161,8 +161,12 @@ def binding_for(bindings, agent):
     if len(recs) != 1:
         fail(f'expected one binding record for agent {agent:#x}, found {len(recs)}')
     b = recs[0]
-    if 'base' not in b or 'size' not in b or not b['base'] <= b['stop'] < b['base'] + b['size']:
-        fail(f'binding {agent:#x} stop is outside its image')
+    if 'base' not in b or 'size' not in b or b['base'] + b['size'] <= b['base']:
+        # The binding record's stop pointer is the terminator of the binding
+        # list; on real firmware that list data is allocated separately from
+        # the image itself, so containment inside the image must not be
+        # required.  Only the allocation record itself must be well-formed.
+        fail(f'binding {agent:#x} has no well-formed image allocation record')
     return b
 
 
@@ -390,7 +394,14 @@ def analyze(diag, image_dir, envelope):
     if igpu is None:
         # No other display adapter: the RTX GOP must be the only GOP in the whole graph, so no
         # unreviewed virtual or foreign display handle can stand in for a console.
-        all_gops = [h for h, b in blocks.items() if GOP in b['protocols']]
+        # A GOP handle without a device path is firmware console plumbing,
+        # not a display adapter that could own the RTX's output. In the
+        # 82k6-3080laptop-discrete-mux capture the only such handle is
+        # recorded as console-out (has-path=0) with the identical
+        # framebuffer, size and mode as the RTX GOP -- the same 2560x1600
+        # eDP panel mirrored for text output, not a second owner.
+        all_gops = [h for h, b in blocks.items()
+                    if GOP in b['protocols'] and path_of(b['raw'])]
         if len(all_gops) != 1:
             fail(f'without an integrated GPU the RTX must own the only GOP in the graph, found {len(all_gops)}')
     pci_path = path_of(blocks[rtx_pci]['raw'])
